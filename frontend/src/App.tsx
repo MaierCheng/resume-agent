@@ -1,5 +1,17 @@
 import { useState } from 'react'
 
+interface SponsorResult {
+  overall_likelihood: string
+  h1b_likelihood: string
+  opt_likelihood: string
+  cpt_likelihood: string
+  company_size: string
+  e_verify_likely: boolean
+  keyword_signals: { sponsor: string[], no_sponsor: string[] }
+  llm_signals: string[]
+  reasoning: string
+}
+
 interface SkillMatch {
   matched_skills: string[]
   skill_gaps: string[]
@@ -17,6 +29,7 @@ interface AnalysisResult {
   }
   analyzed_jd: {
     title: string
+    company: string
     summary: string
     required_skills: string[]
   }
@@ -26,6 +39,7 @@ interface AnalysisResult {
     tips: string[]
   }
   cover_letter: string
+  sponsor: SponsorResult
 }
 
 interface ProgressStep {
@@ -34,12 +48,13 @@ interface ProgressStep {
 }
 
 const STEPS = [
-  'Extracting PDF text...',
+  'Extracting PDF...',
   'Parsing resume...',
-  'Analyzing job description...',
+  'Analyzing JD...',
   'Matching skills...',
-  'Rewriting resume bullets...',
+  'Rewriting bullets...',
   'Generating cover letter...',
+  'Checking visa sponsorship...',
 ]
 
 function ScoreBar({ score, label }: { score: number; label: string }) {
@@ -54,6 +69,20 @@ function ScoreBar({ score, label }: { score: number; label: string }) {
         <div className={`${color} h-2 rounded-full transition-all duration-500`} style={{ width: `${score}%` }} />
       </div>
     </div>
+  )
+}
+
+function LikelihoodBadge({ value }: { value: string }) {
+  const styles = {
+    yes: 'bg-green-50 border-green-200 text-green-700',
+    no: 'bg-red-50 border-red-200 text-red-700',
+    unknown: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+  }
+  const labels = { yes: 'Likely', no: 'Unlikely', unknown: 'Unknown' }
+  const style = styles[value as keyof typeof styles] || styles.unknown
+  const label = labels[value as keyof typeof labels] || 'Unknown'
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs border font-medium ${style}`}>{label}</span>
   )
 }
 
@@ -98,7 +127,6 @@ function App() {
 
         for (const line of lines) {
           const json = JSON.parse(line.slice(6))
-
           if (json.type === 'progress') {
             setProgress({ step: json.step, label: json.label })
           } else if (json.type === 'result') {
@@ -124,7 +152,7 @@ function App() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Resume Agent</h1>
         <p className="text-gray-500 mb-8">Upload your resume and paste a job description to get an instant analysis.</p>
 
-        {/* Input Section */}
+        {/* Input */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
           <div className="mb-5">
             <label className="block text-sm font-medium text-gray-700 mb-2">Resume (PDF)</label>
@@ -183,7 +211,81 @@ function App() {
         {result && (
           <div className="space-y-5">
 
-            {/* Match Scores */}
+            {/* Visa Sponsorship */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Visa Sponsorship</h2>
+
+              {/* Overall */}
+              <div className={`rounded-xl p-4 mb-4 border ${
+                result.sponsor.overall_likelihood === 'yes' ? 'bg-green-50 border-green-200' :
+                result.sponsor.overall_likelihood === 'no' ? 'bg-red-50 border-red-200' :
+                'bg-yellow-50 border-yellow-200'
+              }`}>
+                <p className={`text-lg font-semibold ${
+                  result.sponsor.overall_likelihood === 'yes' ? 'text-green-700' :
+                  result.sponsor.overall_likelihood === 'no' ? 'text-red-700' :
+                  'text-yellow-700'
+                }`}>
+                  {result.sponsor.overall_likelihood === 'yes' ? '✓ Likely sponsors visas' :
+                   result.sponsor.overall_likelihood === 'no' ? '✕ Unlikely to sponsor' :
+                   '? Sponsorship unknown'}
+                </p>
+                <p className="text-sm text-gray-600 mt-1">{result.sponsor.reasoning}</p>
+              </div>
+
+              {/* CPT / OPT / H-1B */}
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {[
+                  { label: 'CPT', value: result.sponsor.cpt_likelihood, desc: 'Curricular practical training' },
+                  { label: 'OPT / STEM OPT', value: result.sponsor.opt_likelihood, desc: 'Optional practical training' },
+                  { label: 'H-1B', value: result.sponsor.h1b_likelihood, desc: 'Work visa sponsorship' },
+                ].map(({ label, value, desc }) => (
+                  <div key={label} className={`rounded-lg p-3 border ${
+                    value === 'yes' ? 'bg-green-50 border-green-200' :
+                    value === 'no' ? 'bg-red-50 border-red-200' :
+                    'bg-yellow-50 border-yellow-200'
+                  }`}>
+                    <p className="text-xs text-gray-500 mb-1">{desc}</p>
+                    <p className="text-sm font-semibold text-gray-800 mb-1">{label}</p>
+                    <LikelihoodBadge value={value} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Company info */}
+              <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                <span>Company size: <span className="font-medium text-gray-800">{result.sponsor.company_size}</span></span>
+                <span>E-Verify: <span className={`font-medium ${result.sponsor.e_verify_likely ? 'text-green-700' : 'text-yellow-700'}`}>
+                  {result.sponsor.e_verify_likely ? 'Likely registered' : 'Unknown'}
+                </span></span>
+              </div>
+
+              {/* Red flag keywords */}
+              {result.sponsor.keyword_signals.no_sponsor.length > 0 && (
+                <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                  <p className="text-xs font-medium text-red-700 mb-2">⚠ Red flag keywords detected:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {result.sponsor.keyword_signals.no_sponsor.map((k: string, i: number) => (
+                      <span key={i} className="px-2 py-0.5 bg-white text-red-600 text-xs rounded border border-red-200">{k}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Positive keywords */}
+              {result.sponsor.keyword_signals.sponsor.length > 0 && (
+                <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <p className="text-xs font-medium text-green-700 mb-2">✓ Positive keywords detected:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {result.sponsor.keyword_signals.sponsor.map((k: string, i: number) => (
+                      <span key={i} className="px-2 py-0.5 bg-white text-green-600 text-xs rounded border border-green-200">{k}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Match Score */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Match Score</h2>
               <div className="space-y-4">
@@ -196,8 +298,11 @@ function App() {
 
             {/* JD Summary */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-2">
-                Job: {result.analyzed_jd.title}
+              <h2 className="text-lg font-semibold text-gray-800 mb-1">
+                {result.analyzed_jd.title}
+                {result.analyzed_jd.company && result.analyzed_jd.company !== 'unknown' && (
+                  <span className="text-gray-400 font-normal"> @ {result.analyzed_jd.company}</span>
+                )}
               </h2>
               <p className="text-gray-600 text-sm">{result.analyzed_jd.summary}</p>
             </div>

@@ -15,11 +15,12 @@ Return ONLY a valid JSON object with no markdown or explanation.`),
     new HumanMessage(`Analyze this job description and return JSON with this exact structure:
 {
   "title": "job title",
+  "company": "company name, or unknown if not mentioned",
   "summary": "2-3 sentence summary of the role",
-  "required_skills": ["skill1", "skill2"],
-  "nice_to_have_skills": ["skill1", "skill2"],
-  "experience_years": 3,
-  "responsibilities": ["responsibility1", "responsibility2"]
+  "required_skills": ["extract EVERY technical skill mentioned: programming languages, frameworks, libraries, tools, platforms, and concepts. Include all of them — do not summarize or limit. Exclude soft skills like communication or teamwork."],
+  "nice_to_have_skills": ["same rules as required_skills but for preferred/bonus skills only"],
+  "experience_years": <number, use 0 if not specified>,
+  "responsibilities": ["responsibility 1", "responsibility 2"]
 }
 
 JOB DESCRIPTION:
