@@ -1,16 +1,14 @@
 const express = require('express');
 const multer = require('multer');
 const { extractTextFromPDF } = require('../services/pdfParser');
-const { analyzeResumeWithJD } = require('../services/aiService');
+const { runPipeline } = require('../services/pipeline');
 
 const router = express.Router();
-
-// Store uploaded file in memory (not on disk)
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.post('/analyze', upload.single('resume'), async (req, res) => {
   try {
-    // 1. Check that both resume and JD were provided
+    // Validate inputs
     if (!req.file) {
       return res.status(400).json({ error: 'Please upload a resume PDF' });
     }
@@ -18,18 +16,37 @@ router.post('/analyze', upload.single('resume'), async (req, res) => {
       return res.status(400).json({ error: 'Please provide a job description' });
     }
 
-    // 2. Extract text from the uploaded PDF
+    // Set up SSE (Server-Sent Events) for streaming progress
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    // Helper to send SSE events to frontend
+    const sendEvent = (type, data) => {
+      res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
+    };
+
+    // Extract text from PDF
+    sendEvent('progress', { step: 0, label: 'Extracting PDF text...' });
     const resumeText = await extractTextFromPDF(req.file.buffer);
 
-    // 3. Send to OpenAI for analysis
-    const result = await analyzeResumeWithJD(resumeText, req.body.jobDescription);
+    // Run the 5-step pipeline, streaming progress at each step
+    const result = await runPipeline(
+      resumeText,
+      req.body.jobDescription,
+      ({ step, label }) => sendEvent('progress', { step, label })
+    );
 
-    // 4. Return the result to the frontend
-    res.json({ success: true, data: result });
+    // Send final result
+    sendEvent('result', { data: result });
+
+    // End the stream
+    res.end();
 
   } catch (error) {
-    console.error('Analysis error:', error.message);
-    res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    console.error('Pipeline error:', error.message);
+    res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+    res.end();
   }
 });
 
