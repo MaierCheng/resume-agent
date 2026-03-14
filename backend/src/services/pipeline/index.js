@@ -10,6 +10,8 @@ async function runPipeline(resumeText, jobDescription, onProgress) {
   onProgress({ step: 1, label: 'Parsing resume...' });
   const parsedResume = await parseResume(resumeText);
 
+  console.log('PARSED RESUME:', JSON.stringify(parsedResume, null, 2)); // 临时debug
+
   // Step 2: Analyze JD
   onProgress({ step: 2, label: 'Analyzing job description...' });
   const analyzedJD = await analyzeJD(jobDescription);
@@ -22,6 +24,7 @@ async function runPipeline(resumeText, jobDescription, onProgress) {
   onProgress({ step: 4, label: 'Rewriting resume bullets...' });
   const rewrittenResume = await rewriteResume(parsedResume, analyzedJD, skillMatch);
 
+  console.log('REWRITTEN:', JSON.stringify(rewrittenResume.experiences.map(e => ({ company: e.company, type: e.type })), null, 2));
   // Step 5: Generate Cover Letter
   onProgress({ step: 5, label: 'Generating cover letter...' });
   const coverLetter = await generateCoverLetter(parsedResume, analyzedJD, skillMatch);

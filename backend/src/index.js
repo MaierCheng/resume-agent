@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const analyzeRoute = require('./routes/analyze');
+const pdfRoute = require('./routes/pdf');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +13,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api', analyzeRoute);
+app.use('/api', pdfRoute);
 
 // Health check
 app.get('/', (req, res) => {
