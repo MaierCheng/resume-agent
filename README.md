@@ -2,6 +2,18 @@
 
 An AI-powered job application assistant built for international students on F-1 visas. Upload your resume PDF and paste a job description to get an instant, end-to-end analysis — from skill matching to a fully formatted LaTeX resume PDF.
 
+## Demo
+**Analysis Process**
+
+![Analysis](docs/screenshots/analyzing.png)
+
+**AI Resume Agent Results**
+
+
+![AI Resume Agent Results](docs/screenshots/result1.png)
+![AI Resume Agent Results](docs/screenshots/result2.png)
+![AI Resume Agent Results](docs/screenshots/result3.png)
+
 ---
 
 ## Features
